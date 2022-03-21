@@ -1,2 +1,3 @@
 # solid-react
-SolidJS-like React
+
+Kits for a SolidJS-like React
