@@ -1,7 +1,7 @@
 {
   "name": "solid-react",
   "version": "0.0.1",
-  "description": "Kits for a SolidJS-like React",
+  "description": "Hooks for a SolidJS-like React",
   "license": "MIT",
   "keywords": [
     "react",
@@ -22,7 +22,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && rollup -c --configPlugin @rollup/plugin-typescript"
+    "build": "rm -rf dist && rollup -c --configPlugin @rollup/plugin-typescript",
+    "watch": "rollup -wc --configPlugin @rollup/plugin-typescript"
   },
   "peerDependencies": {
     "react": ">=16.8.0",
@@ -37,9 +38,9 @@
     "@typescript-eslint/parser": "^5.16.0",
     "eslint": "^8.11.0",
     "eslint-config-prettier": "^8.5.0",
+    "eslint-config-react-app": "^7.0.0",
     "eslint-plugin-import": "^2.25.4",
     "eslint-plugin-prettier": "^4.0.0",
-    "eslint-plugin-react-hooks": "^4.3.0",
     "prettier": "^2.6.0",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
