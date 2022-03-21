@@ -1852,7 +1852,7 @@ packages:
     hasBin: true
     dependencies:
       caniuse-lite: 1.0.30001319
-      electron-to-chromium: 1.4.88
+      electron-to-chromium: 1.4.89
       escalade: 3.1.1
       node-releases: 2.0.2
       picocolors: 1.0.0
@@ -2027,8 +2027,8 @@ packages:
       esutils: 2.0.3
     dev: true
 
-  /electron-to-chromium/1.4.88:
-    resolution: {integrity: sha512-oA7mzccefkvTNi9u7DXmT0LqvhnOiN2BhSrKerta7HeUC1cLoIwtbf2wL+Ah2ozh5KQd3/1njrGrwDBXx6d14Q==}
+  /electron-to-chromium/1.4.89:
+    resolution: {integrity: sha512-z1Axg0Fu54fse8wN4fd+GAINdU5mJmLtcl6bqIcYyzNVGONcfHAeeJi88KYMQVKalhXlYuVPzKkFIU5VD0raUw==}
     dev: true
 
   /emoji-regex/9.2.2:
