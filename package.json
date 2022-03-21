@@ -15,7 +15,7 @@
   "bugs": "https://github.com/nanxiaobei/solid-react/issues",
   "main": "dist/solid-react.cjs.js",
   "module": "dist/solid-react.esm.js",
-  "types": "dist/types.d.ts",
+  "types": "dist/solid-react.d.ts",
   "files": [
     "dist"
   ],
