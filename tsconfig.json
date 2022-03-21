@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
+    "jsx": "react",
     "target": "es5",
     "module": "esnext",
     "moduleResolution": "node",
-    "outDir": "./dist",
+    "resolveJsonModule": true,
 
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -22,9 +23,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": true,
-
-    "resolveJsonModule": true
-  },
-  "include": ["*.ts", "*.tsx"]
+    "noFallthroughCasesInSwitch": true
+  }
 }

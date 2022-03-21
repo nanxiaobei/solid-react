@@ -4,12 +4,12 @@ module.exports = {
     ecmaVersion: 'latest',
     sourceType: 'module',
     project: './tsconfig.json',
+    createDefaultProgram: true,
   },
   plugins: ['@typescript-eslint'],
   extends: [
-    'eslint:recommended',
+    'react-app',
     'plugin:@typescript-eslint/recommended',
-    'plugin:react-hooks/recommended',
     'plugin:prettier/recommended',
   ],
   env: {
@@ -18,6 +18,6 @@ module.exports = {
     es6: true,
   },
   settings: {
-    'import/resolver': { node: { extensions: ['.js', '.ts'] } },
+    'import/resolver': { node: { extensions: ['.ts', '.tsx'] } },
   },
 };

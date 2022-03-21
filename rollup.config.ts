@@ -2,7 +2,7 @@ import typescript from '@rollup/plugin-typescript';
 import dts from 'rollup-plugin-dts';
 import pkg from './package.json';
 
-const input = 'src/index.ts';
+const input = 'src/index.tsx';
 const deps = Object.keys(pkg.peerDependencies);
 const external = (id: string) => deps.includes(id);
 const plugins = [typescript()];
