@@ -26,7 +26,7 @@ export function useSignal<T>(initialValue?: T): [GetValue<T>, SetValue<T>] {
     listeners.current.push(setValue);
   });
   const delListener = useRef((setValue: SetValue<T>) => {
-    listeners.current.splice(listeners.current.indexOf(setValue));
+    listeners.current.splice(listeners.current.indexOf(setValue), 1);
   });
 
   const hasMemo = useRef(false);
