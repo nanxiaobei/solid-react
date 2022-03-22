@@ -3,7 +3,6 @@
 Hooks for a SolidJS-like React
 
 [![npm](https://img.shields.io/npm/v/solid-react?style=flat-square)](https://www.npmjs.com/package/solid-react)
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/nanxiaobei/solid-react/Test?style=flat-square)](https://github.com/nanxiaobei/solid-react/actions?query=workflow%3ATest)
 [![npm bundle size](https://img.shields.io/bundlephobia/minzip/solid-react?style=flat-square)](https://bundlephobia.com/result?p=solid-react)
 [![npm type definitions](https://img.shields.io/npm/types/typescript?style=flat-square)](https://github.com/nanxiaobei/solid-react/blob/main/src/index.ts)
 [![GitHub](https://img.shields.io/github/license/nanxiaobei/solid-react?style=flat-square)](https://github.com/nanxiaobei/solid-react/blob/main/LICENSE)
