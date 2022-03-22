@@ -1,4 +1,4 @@
-# solid-react
+# 🧿 solid-react
 
 Hooks for a SolidJS-like React
 
@@ -9,6 +9,10 @@ Hooks for a SolidJS-like React
 [![GitHub](https://img.shields.io/github/license/nanxiaobei/solid-react?style=flat-square)](https://github.com/nanxiaobei/solid-react/blob/main/LICENSE)
 
 ## API
+
+---
+
+> **Basic Reactivity**
 
 ### `useSignal`
 
@@ -36,6 +40,10 @@ const value = useAuto(() => computeExpensiveValue(a(), b()));
 // read value
 value();
 ```
+
+---
+
+> **Lifecycles**
 
 ### `useMount`
 
