@@ -25,7 +25,7 @@ export function useSignal<T>(initialValue?: T): [GetValue<T>, SetValue<T>] {
   const addListener = useRef((setValue: SetValue<T>) => {
     listeners.current.push(setValue);
   });
-  const delListener = useRef((setValue: SetValue<T>) => {
+  const removeListener = useRef((setValue: SetValue<T>) => {
     listeners.current.splice(listeners.current.indexOf(setValue), 1);
   });
 
@@ -35,8 +35,8 @@ export function useSignal<T>(initialValue?: T): [GetValue<T>, SetValue<T>] {
     if (hasMemo.current) {
       memos.current.forEach((memo) => {
         if (doneMemos.indexOf(memo) > -1) return;
-        doneMemos.push(memo);
         memo();
+        doneMemos.push(memo);
       });
       hasMemo.current = false;
     }
@@ -48,8 +48,8 @@ export function useSignal<T>(initialValue?: T): [GetValue<T>, SetValue<T>] {
     if (hasEffect.current) {
       effects.current.forEach((effect) => {
         if (doneEffects.indexOf(effect) > -1) return;
-        doneEffects.push(effect);
         effect();
+        doneEffects.push(effect);
       });
       hasEffect.current = false;
     }
@@ -66,7 +66,7 @@ export function useSignal<T>(initialValue?: T): [GetValue<T>, SetValue<T>] {
   const Render = () => {
     const [value, setValue] = useState(valueRef.current);
     useMemo(() => addListener.current(setValue), []);
-    useEffect(() => () => delListener.current(setValue), []);
+    useEffect(() => () => removeListener.current(setValue), []);
 
     useLayoutEffect(() => runMemos.current());
     useLayoutEffect(() => runEffects.current());
