@@ -3,8 +3,8 @@ import dts from 'rollup-plugin-dts';
 import pkg from './package.json';
 
 const input = 'src/index.tsx';
-const deps = Object.keys(pkg.peerDependencies);
-const external = (id: string) => deps.includes(id);
+const peer = Object.keys(pkg.peerDependencies);
+const external = (id: string) => peer.includes(id);
 const plugins = [typescript()];
 
 const cjsOutput = { file: pkg.main, format: 'cjs', exports: 'auto' };

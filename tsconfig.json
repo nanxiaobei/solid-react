@@ -4,12 +4,12 @@
     "target": "es5",
     "module": "esnext",
     "moduleResolution": "node",
-    "resolveJsonModule": true,
 
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
 
     "strict": true,
     "noImplicitAny": true,
@@ -24,5 +24,6 @@
     "noUnusedParameters": true,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true
-  }
+  },
+  "exclude": ["node_modules", "dist"]
 }
