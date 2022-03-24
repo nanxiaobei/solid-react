@@ -7,8 +7,7 @@ type SetValue<T> = Dispatch<SetStateAction<T>>;
 
 const isSSR = typeof window === 'undefined';
 const useIsomorphicLayoutEffect = isSSR ? useEffect : useLayoutEffect;
-const bulk = ReactDOM.unstable_batchedUpdates;
-const batch = (updater: () => void) => (bulk ? bulk(updater) : updater());
+const batch = ReactDOM.unstable_batchedUpdates || ((run: () => void) => run());
 
 const onceCallbacks = new Set<() => void>();
 let currentCallback: (() => void) | null = null;
