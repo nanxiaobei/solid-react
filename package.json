@@ -22,8 +22,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && rollup -c --configPlugin @rollup/plugin-typescript",
-    "watch": "rollup -wc --configPlugin @rollup/plugin-typescript"
+    "watch": "rollup -wc --configPlugin @rollup/plugin-typescript",
+    "build": "rm -rf dist && rollup -c --configPlugin @rollup/plugin-typescript"
   },
   "peerDependencies": {
     "react": ">=16.8.0",
@@ -50,9 +50,6 @@
     "typescript": "^4.6.2"
   },
   "eslintIgnore": [
-    "dist"
-  ],
-  "prettierIgnore": [
     "dist"
   ],
   "prettier": {
