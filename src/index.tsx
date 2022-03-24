@@ -7,156 +7,126 @@ import React, {
 } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
-type Callback = () => void;
 type GetValue<T> = () => T;
 type SetValue<T> = Dispatch<SetStateAction<T>>;
 
-let currentMemo: null | Callback = null;
-let currentEffect: null | Callback = null;
+const isSSR = typeof window === 'undefined';
+const useIsomorphicLayoutEffect = isSSR ? useEffect : useLayoutEffect;
+const uniqueCallbacks = new Set<() => void>();
+let currentCallback: (() => void) | null = null;
 
-let doneTimer: ReturnType<typeof setTimeout>;
-const doneMemos: Callback[] = [];
-const doneEffects: Callback[] = [];
-
-export function useSignal<T>(initialValue?: T): [GetValue<T>, SetValue<T>] {
-  const valueRef = useRef<T>(initialValue as T);
-
+export function useSignal<T>(initialValue: T): [GetValue<T>, SetValue<T>] {
+  const valRef = useRef<T>(initialValue as T);
   const listeners = useRef<SetValue<T>[]>([]);
-  const addListener = useRef((setValue: SetValue<T>) => {
-    listeners.current.push(setValue);
-  });
-  const removeListener = useRef((setValue: SetValue<T>) => {
-    listeners.current.splice(listeners.current.indexOf(setValue), 1);
-  });
 
-  const hasMemo = useRef(false);
-  const memos = useRef<Callback[]>([]);
-  const runMemos = useRef(() => {
-    if (hasMemo.current) {
-      memos.current.forEach((memo) => {
-        if (doneMemos.indexOf(memo) > -1) return;
-        memo();
-        doneMemos.push(memo);
-      });
-      hasMemo.current = false;
-    }
-  });
-
-  const hasEffect = useRef(false);
-  const effects = useRef<Callback[]>([]);
-  const runEffects = useRef(() => {
-    if (hasEffect.current) {
-      effects.current.forEach((effect) => {
-        if (doneEffects.indexOf(effect) > -1) return;
-        effect();
-        doneEffects.push(effect);
-      });
-      hasEffect.current = false;
-    }
-  });
-
-  const clearDoneCallbacks = useRef(() => {
-    clearTimeout(doneTimer);
-    doneTimer = setTimeout(() => {
-      doneMemos.length = 0;
-      doneEffects.length = 0;
-    }, 10);
+  const hasUpdate = useRef(false);
+  const callbacks = useRef<(() => void)[]>([]);
+  const runCallbacks = useRef(() => {
+    callbacks.current.forEach((fn) => fn());
+    setTimeout(() => uniqueCallbacks.clear(), 10);
   });
 
   const Render = () => {
-    const [value, setValue] = useState(valueRef.current);
-    useMemo(() => addListener.current(setValue), []);
-    useEffect(() => () => removeListener.current(setValue), []);
+    const [value, setValue] = useState(valRef.current);
 
-    useLayoutEffect(() => runMemos.current());
-    useLayoutEffect(() => runEffects.current());
-    useEffect(() => clearDoneCallbacks.current());
+    useIsomorphicLayoutEffect(() => {
+      listeners.current.push(setValue);
+      return () => {
+        listeners.current.splice(listeners.current.indexOf(setValue), 1);
+      };
+    }, []);
+
+    useIsomorphicLayoutEffect(() => {
+      if (hasUpdate.current) {
+        hasUpdate.current = false;
+        runCallbacks.current();
+      }
+    });
 
     return value as unknown as JSX.Element;
   };
 
-  return useMemo(
-    () => [
-      () => {
-        try {
-          if (currentMemo) {
-            memos.current.push(currentMemo);
-            return valueRef.current;
-          }
-
-          if (currentEffect) {
-            effects.current.push(currentEffect);
-            return valueRef.current;
-          }
-
-          useState(); // eslint-disable-line react-hooks/rules-of-hooks
-
-          return (<Render />) as unknown as T;
-        } catch (e) {
-          return valueRef.current;
+  return useMemo(() => {
+    const getter = () => {
+      try {
+        if (currentCallback) {
+          callbacks.current.push(currentCallback);
+          return valRef.current;
         }
-      },
-      (newValue) => {
-        listeners.current.forEach((listener) => {
-          listener((prevValue) => {
-            let nextValue;
-            if (newValue instanceof Function) {
-              nextValue = newValue(prevValue);
-            } else {
-              nextValue = newValue;
-            }
-
-            valueRef.current = nextValue;
-            return nextValue;
-          });
+        useState(); // eslint-disable-line react-hooks/rules-of-hooks
+        return (<Render />) as unknown as T;
+      } catch (e) {
+        return valRef.current;
+      }
+    };
+    const setter = (val: SetStateAction<T>) => {
+      const getNext = (prev: T) => (val instanceof Function ? val(prev) : val);
+      if (listeners.current.length === 0) {
+        valRef.current = getNext(valRef.current);
+        runCallbacks.current();
+        return;
+      }
+      listeners.current.forEach((listener) => {
+        listener((prev) => {
+          const next = getNext(prev);
+          valRef.current = next;
+          return next;
         });
-
-        hasMemo.current = true;
-        hasEffect.current = true;
-      },
-    ],
-    []
-  );
+      });
+      hasUpdate.current = true;
+    };
+    return [getter, setter];
+  }, []);
 }
 
-export function useUpdate(fn: Callback) {
+export function useUpdate(fn: () => void) {
   const fnRef = useRef(fn);
   fnRef.current = fn;
 
-  useEffect(() => {
-    currentEffect = fnRef.current;
+  useIsomorphicLayoutEffect(() => {
+    const callback = () => {
+      if (uniqueCallbacks.has(callback)) return;
+      uniqueCallbacks.add(callback);
+      fnRef.current();
+    };
+    currentCallback = callback;
     fnRef.current();
-    currentEffect = null;
+    currentCallback = null;
   }, []);
 }
 
 export function useAuto<T>(fn: GetValue<T>): GetValue<T> {
   const fnRef = useRef(fn);
   fnRef.current = fn;
-  const valRef = useRef<T>();
 
-  useMemo(() => {
-    currentMemo = () => setterRef.current(fnRef.current());
-    valRef.current = fnRef.current();
-    currentMemo = null;
+  const initVal = useMemo(() => {
+    const callback = () => {
+      if (uniqueCallbacks.has(callback)) return;
+      uniqueCallbacks.add(callback);
+      setterRef.current(fnRef.current());
+    };
+
+    currentCallback = callback;
+    const val = fnRef.current();
+    currentCallback = null;
+    return val;
   }, []);
 
-  const [value, setValue] = useSignal<T>(valRef.current);
+  const [value, setValue] = useSignal<T>(initVal);
   const setterRef = useRef(setValue);
-
   return value;
 }
 
-export function useMount(fn: Callback) {
+export function useMount(fn: () => void) {
   const fnRef = useRef(fn);
   fnRef.current = fn;
 
-  useEffect(() => fnRef.current(), []);
+  useIsomorphicLayoutEffect(() => fnRef.current(), []);
 }
 
-export function useCleanup(fn: Callback) {
+export function useCleanup(fn: () => void) {
   const fnRef = useRef(fn);
   fnRef.current = fn;
 
-  useEffect(() => () => fnRef.current(), []);
+  useIsomorphicLayoutEffect(() => () => fnRef.current(), []);
 }
