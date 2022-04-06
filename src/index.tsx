@@ -1,6 +1,7 @@
 import React, {
   useState,
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   useLayoutEffect,
@@ -16,16 +17,18 @@ type Flow = {
   deadDeps: Map<MutableRefObject<any>, () => void>;
   callback: (_isUpdate: boolean) => void;
 };
-type Flows = Set<Flow>;
+type FlowSet = Set<Flow>;
+type RenderProps = { path?: string[]; mapFn?: typeof Array.prototype.map };
 
 const isSSR = typeof window === 'undefined';
 const useIsomorphicLayoutEffect = isSSR ? useEffect : useLayoutEffect;
 const batch = ReactDOM.unstable_batchedUpdates || ((fn: () => void) => fn());
+const isObj = (data: any) => typeof data === 'object';
 
 let currentFlow: Flow | null = null;
 const allFlows = new Set<Flow>();
 
-const runFlows = (flows: Flows) => {
+const runFlows = (flows: FlowSet) => {
   batch(() => {
     flows.forEach((flow) => {
       if (allFlows.has(flow)) return;
@@ -41,20 +44,20 @@ const runFlows = (flows: Flows) => {
 };
 
 export function useSignal<T>(initialValue: T): [GetValue<T>, SetValue<T>] {
-  const valueRef = useRef<T>(initialValue as T);
+  const valRef = useRef<T>(initialValue as T);
   const listeners = useRef<SetValue<T>[]>([]);
 
   const hasUpdate = useRef(false);
-  const flowsArr = useRef<Flows[]>(null as unknown as Flows[]);
-  if (!flowsArr.current) flowsArr.current = [new Set(), new Set()];
+  const flowsArr = useRef<FlowSet[]>(null as unknown as FlowSet[]);
+  if (!flowsArr.current) flowsArr.current = [new Set(), new Set(), new Set()];
 
   const isFirst = useRef(true);
   useIsomorphicLayoutEffect(() => {
     isFirst.current ? (isFirst.current = false) : runFlows(flowsArr.current[0]);
   }, []);
 
-  const Render = () => {
-    const [value, setValue] = useState(valueRef.current);
+  const Render = ({ path, mapFn }: RenderProps) => {
+    const [value, setValue] = useState(valRef.current);
 
     useIsomorphicLayoutEffect(() => {
       listeners.current.push(setValue);
@@ -70,8 +73,23 @@ export function useSignal<T>(initialValue: T): [GetValue<T>, SetValue<T>] {
       }
     });
 
-    return value as unknown as JSX.Element;
+    if (!Array.isArray(path)) return value;
+    const val = path.reduce((obj: any, key: string) => obj[key], value);
+    return mapFn ? val.map(mapFn) : val;
   };
+
+  const proxy = useCallback((obj: any, path: string[]): T => {
+    return new Proxy(obj, {
+      get: (target, key: string) => {
+        const val = target[key];
+        if (key === 'map' && val === Array.prototype.map) {
+          return (mapFn: any) => <Render path={path} mapFn={mapFn} />;
+        }
+        path.push(key);
+        return isObj(val) ? proxy(val, path) : <Render path={path} />;
+      },
+    });
+  }, []);
 
   return useMemo(() => {
     flowsArr.current.forEach((flows) => flows.clear());
@@ -84,14 +102,17 @@ export function useSignal<T>(initialValue: T): [GetValue<T>, SetValue<T>] {
             const flows = flowsArr.current[flow.arrIndex];
 
             flows.add(flow);
-            flow.deadDeps.delete(valueRef);
-            flow.liveDeps.set(valueRef, () => flows.delete(flow));
-            return valueRef.current;
+            flow.deadDeps.delete(valRef);
+            flow.liveDeps.set(valRef, () => flows.delete(flow));
+            return valRef.current;
           }
+
           useState(); // eslint-disable-line react-hooks/rules-of-hooks
+
+          if (isObj(valRef.current)) return proxy(valRef.current, []);
           return (<Render />) as unknown as T;
         } catch (e) {
-          return valueRef.current;
+          return valRef.current;
         }
       },
       (payload: SetStateAction<T>) => {
@@ -99,20 +120,20 @@ export function useSignal<T>(initialValue: T): [GetValue<T>, SetValue<T>] {
           payload instanceof Function ? payload(prev) : payload;
 
         if (listeners.current.length === 0) {
-          valueRef.current = getNext(valueRef.current);
+          valRef.current = getNext(valRef.current);
           flowsArr.current.forEach((flows) => runFlows(flows));
           return;
         }
 
         batch(() => {
           listeners.current.forEach((listener) => {
-            listener((prev) => (valueRef.current = getNext(prev)));
+            listener((prev) => (valRef.current = getNext(prev)));
           });
         });
         hasUpdate.current = true;
       },
     ];
-  }, []);
+  }, [proxy]);
 }
 
 export function useUpdate(fn: () => void) {
@@ -173,4 +194,8 @@ export function useCleanup(fn: () => void) {
   fnRef.current = fn;
 
   useIsomorphicLayoutEffect(() => () => fnRef.current(), []);
+}
+
+export function Run<T>(fn: GetValue<T>): T {
+  return useAuto(fn)();
 }
