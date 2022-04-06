@@ -7,11 +7,7 @@ module.exports = {
     createDefaultProgram: true,
   },
   plugins: ['@typescript-eslint'],
-  extends: [
-    'react-app',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:prettier/recommended',
-  ],
+  extends: ['react-app', 'plugin:@typescript-eslint/recommended', 'prettier'],
   env: {
     browser: true,
     node: true,

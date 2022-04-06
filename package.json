@@ -40,7 +40,6 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-config-react-app": "^7.0.0",
     "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-prettier": "^4.0.0",
     "prettier": "^2.6.2",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
