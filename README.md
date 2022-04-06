@@ -17,11 +17,15 @@ yarn add solid-react
 npm i solid-react
 ```
 
+## Demo
+
+[![Edit solid-react](https://codesandbox.io/static/img/play-codesandbox.svg)](https://codesandbox.io/s/solid-react-rymhr6?fontsize=14&hidenavigation=1&theme=dark)
+
 ## API
 
----
+<br/>
 
-> **Basic Reactivity**
+> Basic Reactivity
 
 ### `useSignal`
 
@@ -56,9 +60,10 @@ const value = useAuto(() => computeExpensiveValue(a(), b()));
 value();
 ```
 
----
+<br/>
+<br/>
 
-> **Lifecycles**
+> Lifecycles
 
 ### `useMount`
 
@@ -78,4 +83,19 @@ el.addEventListener(event, callback);
 
 // register a cleanup method that runs when unmount
 useCleanup(() => el.removeEventListener(event, callback));
+```
+
+<br/>
+<br/>
+
+> Reactive Utilities
+
+### `Run`
+
+```js
+import { Run } from 'solid-react';
+
+// for conditional operator or functions in jsx
+<div>{Run(() => (a() ? b() : c()))}</div>;
+<div>{Run(() => Object.keys(obj())).map((e) => e)}</div>;
 ```
