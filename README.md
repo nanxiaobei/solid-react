@@ -23,10 +23,6 @@ npm i solid-react
 
 ## API
 
-<br/>
-
-> Basic Reactivity
-
 ### `useSignal`
 
 ```js
@@ -60,11 +56,6 @@ const value = useAuto(() => computeExpensiveValue(a(), b()));
 value();
 ```
 
-<br/>
-<br/>
-
-> Lifecycles
-
 ### `useMount`
 
 ```js
@@ -84,11 +75,6 @@ el.addEventListener(event, callback);
 // register a cleanup method that runs when unmount
 useCleanup(() => el.removeEventListener(event, callback));
 ```
-
-<br/>
-<br/>
-
-> Reactive Utilities
 
 ### `Run`
 
