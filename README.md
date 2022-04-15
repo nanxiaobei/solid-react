@@ -39,7 +39,7 @@ return <div>{count()}</div>;
 ```js
 import { useUpdate } from 'solid-react'; // createEffect
 
-const [count, setCount] = useUpdate(0);
+const [count, setCount] = useSignal(0);
 
 // this effect prints count at the beginning and when it changes
 useUpdate(() => console.log('count:', count()));
