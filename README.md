@@ -26,62 +26,68 @@ npm i solid-react
 ### `useSignal`
 
 ```js
-import { useSignal } from 'solid-react'; // createSignal
+import { useSignal } from 'solid-react';
 
 const [count, setCount] = useSignal(0);
 
-// count is a getter function, useSignal returns a getter and a setter
-return <div>{count()}</div>;
+const countDisplay = <div>{count()}</div>;
 ```
+
+Returns a getter and a setter. (like `createSignal`)
 
 ### `useUpdate`
 
 ```js
-import { useUpdate } from 'solid-react'; // createEffect
+import { useUpdate } from 'solid-react';
 
-const [count, setCount] = useUpdate(0);
+const [count, setCount] = useSignal(0);
 
-// this effect prints count at the beginning and when it changes
 useUpdate(() => console.log('count:', count()));
 ```
+
+The callback runs at mount and when its dependencies change. (like `createEffect`)
 
 ### `useAuto`
 
 ```js
-import { useAuto } from 'solid-react'; // createMemo
+import { useAuto } from 'solid-react';
 
 const value = useAuto(() => computeExpensiveValue(a(), b()));
 
-// read value
 value();
 ```
+
+Returns a computed value getter, re-compute when dependencies change. (like `createMemo`)
 
 ### `useMount`
 
 ```js
-import { useMount } from 'solid-react'; // onMount
+import { useMount } from 'solid-react';
 
-// register a method that runs after initial render
 useMount(() => console.log('mounted'));
 ```
+
+Register a method that runs after initial render. (like `onMount`)
 
 ### `useCleanup`
 
 ```js
-import { useCleanup } from 'solid-react'; // onCleanup
+import { useCleanup } from 'solid-react';
 
 el.addEventListener(event, callback);
 
-// register a cleanup method that runs when unmount
 useCleanup(() => el.removeEventListener(event, callback));
 ```
+
+Register a cleanup method that runs when unmount. (like `onCleanup`)
 
 ### `Run`
 
 ```js
 import { Run } from 'solid-react';
 
-// for conditional operator or functions in jsx
 <div>{Run(() => (a() ? b() : c()))}</div>;
 <div>{Run(() => Object.keys(obj())).map((e) => e)}</div>;
 ```
+
+A helper function for conditional operator or executions in jsx.
