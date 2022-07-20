@@ -7,6 +7,24 @@ Hooks for a SolidJS-like React
 [![npm type definitions](https://img.shields.io/npm/types/typescript?style=flat-square)](https://github.com/nanxiaobei/solid-react/blob/main/src/index.ts)
 [![GitHub](https://img.shields.io/github/license/nanxiaobei/solid-react?style=flat-square)](https://github.com/nanxiaobei/solid-react/blob/main/LICENSE)
 
+## Introduction
+
+Turn React into SolidJS, update on demand, no more re-render.
+
+☞ https://nanxiaobei.medium.com/turn-react-into-solidjs-update-on-demand-no-more-re-render-3230fe2f878c
+
+## Demo
+
+Here is a demo, you can open the console, click the button to try, and you will find:
+
+Components don’t re-render anymore, React is completely SolidJS-style on-demand updates!
+
+`useUpdate` `useAuto` don't need anything like `deps`, their dependencies are automatically knew. And only when dependencies change, they execute again.
+
+Yes, that is to say, you can get rid of Hooks, `useCallback` `useMemo` `deps` `memo`, they're unnecessary anymore.
+
+[![Edit solid-react](https://codesandbox.io/static/img/play-codesandbox.svg)](https://codesandbox.io/s/solid-react-rymhr6?fontsize=14&hidenavigation=1&theme=dark)
+
 ## Install
 
 ```bash
@@ -16,10 +34,6 @@ yarn add solid-react
 # or
 npm i solid-react
 ```
-
-## Demo
-
-[![Edit solid-react](https://codesandbox.io/static/img/play-codesandbox.svg)](https://codesandbox.io/s/solid-react-rymhr6?fontsize=14&hidenavigation=1&theme=dark)
 
 ## API
 
