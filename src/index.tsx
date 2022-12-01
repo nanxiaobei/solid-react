@@ -1,37 +1,43 @@
-import React, {
-  useState,
-  useEffect,
+import {
   useCallback,
+  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
-  useLayoutEffect,
+  useState,
 } from 'react';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import ReactDOM from 'react-dom';
-import type { Dispatch, SetStateAction, MutableRefObject } from 'react';
 
-type GetValue<T> = () => T;
-type SetValue<T> = Dispatch<SetStateAction<T>>;
+type Getter<T> = () => T;
+type Setter<T> = Dispatch<SetStateAction<T>>;
 type Flow = {
   arrIndex: number;
-  liveDeps: Map<MutableRefObject<any>, () => void>;
-  deadDeps: Map<MutableRefObject<any>, () => void>;
-  callback: (_isUpdate: boolean) => void;
+  liveDeps: Map<MutableRefObject<unknown>, () => void>;
+  deadDeps: Map<MutableRefObject<unknown>, () => void>;
+  callback: (_isUpdate?: boolean) => void;
 };
 type FlowSet = Set<Flow>;
-type RenderProps = { path?: string[]; mapFn?: typeof Array.prototype.map };
+type RenderProps = {
+  keyPath?: string[];
+  mapCallback?: (...args: unknown[]) => unknown;
+};
 
 const isSSR = typeof window === 'undefined';
 const useIsomorphicLayoutEffect = isSSR ? useEffect : useLayoutEffect;
 const batch = ReactDOM.unstable_batchedUpdates || ((fn: () => void) => fn());
-const isObj = (data: any) => typeof data === 'object';
+const isPrimitive = (data: unknown) => typeof data !== 'object';
 
 let currentFlow: Flow | null = null;
 const allFlows = new Set<Flow>();
 
-const runFlows = (flows: FlowSet) => {
+const runFlows = (flowSet: FlowSet) => {
   batch(() => {
-    flows.forEach((flow) => {
-      if (allFlows.has(flow)) return;
+    flowSet.forEach((flow) => {
+      if (allFlows.has(flow)) {
+        return;
+      }
+
       allFlows.add(flow);
 
       flow.deadDeps = flow.liveDeps;
@@ -40,97 +46,122 @@ const runFlows = (flows: FlowSet) => {
       flow.deadDeps.forEach((remove) => remove());
     });
   });
+
   setTimeout(() => allFlows.clear());
 };
 
-export function useSignal<T>(initialValue: T): [GetValue<T>, SetValue<T>] {
-  const valRef = useRef<T>(initialValue as T);
-  const listeners = useRef<SetValue<T>[]>([]);
+export function useSignal<T>(initialValue: T): [Getter<T>, Setter<T>] {
+  const valRef = useRef<T>(initialValue);
+  const listeners = useRef<Setter<T>[]>([]);
 
   const hasUpdate = useRef(false);
-  const flowsArr = useRef<FlowSet[]>(null as unknown as FlowSet[]);
-  if (!flowsArr.current) flowsArr.current = [new Set(), new Set(), new Set()];
+  const flowSetArr = useRef<FlowSet[]>(null as unknown as FlowSet[]);
+  if (!flowSetArr.current) {
+    flowSetArr.current = [new Set(), new Set(), new Set()];
+  }
 
   const isFirst = useRef(true);
   useIsomorphicLayoutEffect(() => {
-    isFirst.current ? (isFirst.current = false) : runFlows(flowsArr.current[0]);
+    if (isFirst.current) {
+      isFirst.current = false;
+    } else {
+      runFlows(flowSetArr.current[0]);
+    }
   }, []);
 
-  const Render = ({ path, mapFn }: RenderProps) => {
+  const Render = ({ keyPath, mapCallback }: RenderProps) => {
     const [value, setValue] = useState(valRef.current);
 
     useIsomorphicLayoutEffect(() => {
       listeners.current.push(setValue);
       return () => {
-        listeners.current.splice(listeners.current.indexOf(setValue), 1);
+        const index = listeners.current.indexOf(setValue);
+        listeners.current.splice(index, 1);
       };
     }, []);
 
     useIsomorphicLayoutEffect(() => {
       if (hasUpdate.current) {
         hasUpdate.current = false;
-        flowsArr.current.forEach((flows) => runFlows(flows));
+        flowSetArr.current.forEach((flowSet) => runFlows(flowSet));
       }
     });
 
-    if (!Array.isArray(path)) return value;
-    const val = path.reduce((obj: any, key: string) => obj[key], value);
-    return mapFn ? val.map(mapFn) : val;
+    if (!Array.isArray(keyPath)) {
+      return value;
+    }
+
+    const subVal = keyPath.reduce((obj: any, key: string) => obj[key], value);
+
+    return mapCallback ? subVal.map(mapCallback) : subVal;
   };
 
-  const proxy = useCallback((obj: any, path: string[]): T => {
+  const proxy = useCallback((obj: any, keyPath: string[]): T => {
     return new Proxy(obj, {
       get: (target, key: string) => {
         const val = target[key];
+
         if (key === 'map' && val === Array.prototype.map) {
-          return (mapFn: any) => <Render path={path} mapFn={mapFn} />;
+          const fakeArrayMap = (mapCallback: RenderProps['mapCallback']) => {
+            return <Render keyPath={keyPath} mapCallback={mapCallback} />;
+          };
+          return fakeArrayMap;
         }
-        path.push(key);
-        return isObj(val) ? proxy(val, path) : <Render path={path} />;
+
+        keyPath.push(key);
+
+        if (isPrimitive(val)) {
+          return <Render keyPath={keyPath} />;
+        }
+
+        return proxy(val, keyPath);
       },
-    });
+    }) as T;
   }, []);
 
   return useMemo(() => {
-    flowsArr.current.forEach((flows) => flows.clear());
+    flowSetArr.current.forEach((flowSet) => flowSet.clear());
 
     return [
       () => {
         try {
           if (currentFlow) {
             const flow = currentFlow;
-            const flows = flowsArr.current[flow.arrIndex];
+            const flowSet = flowSetArr.current[flow.arrIndex];
 
-            flows.add(flow);
+            flowSet.add(flow);
             flow.deadDeps.delete(valRef);
-            flow.liveDeps.set(valRef, () => flows.delete(flow));
+            flow.liveDeps.set(valRef, () => flowSet.delete(flow));
             return valRef.current;
           }
 
-          useState(); // eslint-disable-line react-hooks/rules-of-hooks
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          useState();
 
-          if (isObj(valRef.current)) return proxy(valRef.current, []);
-          return (<Render />) as unknown as T;
+          if (isPrimitive(valRef.current)) {
+            return (<Render />) as T;
+          }
+
+          return proxy(valRef.current, []);
         } catch (e) {
           return valRef.current;
         }
       },
       (payload: SetStateAction<T>) => {
-        const getNext = (prev: T) =>
+        const getVal = (prev: T) =>
           payload instanceof Function ? payload(prev) : payload;
 
         if (listeners.current.length === 0) {
-          valRef.current = getNext(valRef.current);
-          flowsArr.current.forEach((flows) => runFlows(flows));
-          return;
-        }
-
-        batch(() => {
-          listeners.current.forEach((listener) => {
-            listener((prev) => (valRef.current = getNext(prev)));
+          valRef.current = getVal(valRef.current);
+          flowSetArr.current.forEach((flowSet) => runFlows(flowSet));
+        } else {
+          batch(() => {
+            listeners.current.forEach((listener) => {
+              listener((prev) => (valRef.current = getVal(prev)));
+            });
           });
-        });
-        hasUpdate.current = true;
+          hasUpdate.current = true;
+        }
       },
     ];
   }, [proxy]);
@@ -145,34 +176,38 @@ export function useUpdate(fn: () => void) {
       arrIndex: 1,
       liveDeps: new Map(),
       deadDeps: new Map(),
-      callback: (_isUpdate: boolean) => {
+      callback: () => {
         currentFlow = flow;
         fnRef.current();
         currentFlow = null;
       },
     };
-    flow.callback(false);
+
+    flow.callback();
   }, []);
 }
 
-export function useAuto<T>(fn: GetValue<T>): GetValue<T> {
+export function useAuto<T>(fn: Getter<T>): Getter<T> {
   const fnRef = useRef(fn);
   fnRef.current = fn;
-  const setter = useRef<any>();
+  const setter = useRef<Setter<T>>(() => undefined);
 
   const initVal = useMemo(() => {
     const flow = {
       arrIndex: 0,
       liveDeps: new Map(),
       deadDeps: new Map(),
-      callback: (_isUpdate: boolean) => {
+      callback: (_isUpdate?: boolean) => {
         currentFlow = flow;
         const val = fnRef.current();
-        _isUpdate && setter.current(val);
+        if (_isUpdate) {
+          setter.current(val);
+        }
         currentFlow = null;
         return val;
       },
     };
+
     return flow.callback(false);
   }, []);
 
@@ -196,6 +231,6 @@ export function useCleanup(fn: () => void) {
   useIsomorphicLayoutEffect(() => () => fnRef.current(), []);
 }
 
-export function Run<T>(fn: GetValue<T>): T {
+export function Run<T>(fn: Getter<T>): T {
   return useAuto(fn)();
 }
