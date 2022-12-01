@@ -1,15 +1,15 @@
-import typescript from '@rollup/plugin-typescript';
 import dts from 'rollup-plugin-dts';
-import pkg from './package.json';
+import typescript from '@rollup/plugin-typescript';
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync('./package.json') as unknown as string);
 
 const input = 'src/index.tsx';
-const plugins = [typescript()];
-const peer = Object.keys(pkg.peerDependencies);
-const external = (id: string) => peer.includes(id);
-
 const cjsOutput = { file: pkg.main, format: 'cjs', exports: 'auto' };
 const esmOutput = { file: pkg.module, format: 'es' };
 const dtsOutput = { file: pkg.types, format: 'es' };
+const plugins = [typescript()];
+const external = () => true;
 
 export default [
   { input, output: cjsOutput, plugins, external },
