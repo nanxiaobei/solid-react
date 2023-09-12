@@ -1,6 +1,6 @@
 {
   "name": "solid-react",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Hooks for a SolidJS-like React",
   "license": "MIT",
   "keywords": [
