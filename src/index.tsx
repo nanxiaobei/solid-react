@@ -12,15 +12,13 @@ import ReactDOM from 'react-dom';
 type Getter<T> = () => T;
 type Setter<T> = Dispatch<SetStateAction<T>>;
 type Flow = {
-  arrIndex: number;
-  liveDeps: Map<MutableRefObject<unknown>, () => void>;
-  deadDeps: Map<MutableRefObject<unknown>, () => void>;
-  callback: (_isUpdate?: boolean) => void;
+  nextUnsubMap: Map<MutableRefObject<unknown>, () => void>;
+  willUnsubMap: Map<MutableRefObject<unknown>, () => void>;
+  runFlowFn: (isInit?: 'isInit') => void;
 };
-type FlowSet = Set<Flow>;
-type RenderProps = {
-  keyPath?: string[];
-  mapCallback?: (...args: unknown[]) => unknown;
+type Props = {
+  path?: string[];
+  mapFn?: (...args: unknown[]) => unknown;
 };
 
 const isSSR = typeof window === 'undefined';
@@ -28,110 +26,105 @@ const useIsomorphicLayoutEffect = isSSR ? useEffect : useLayoutEffect;
 const batch = ReactDOM.unstable_batchedUpdates || ((fn: () => void) => fn());
 const isPrimitive = (data: unknown) => typeof data !== 'object';
 
-let currentFlow: Flow | null = null;
-const allFlows = new Set<Flow>();
+let curFlow: Flow | null = null;
+const uniqueFlows = new Set();
 
-const runFlows = (flowSet: FlowSet) => {
+const runValFlows = (valFlows: Set<Flow>) => {
   batch(() => {
-    flowSet.forEach((flow) => {
-      if (allFlows.has(flow)) {
-        return;
+    // A's valFlows: [flow1, flow2]
+    // B's valFlows: [flow1]
+
+    valFlows.forEach((flow) => {
+      if (!uniqueFlows.has(flow)) {
+        uniqueFlows.add(flow); // use uniqueFlows to only run flow once
+
+        // flow1.nextUnsubMap -> { A: unsubFlow1FromA, B: unsubFlow1FromB }
+        // flow1.nextUnsubMap is set in prev `flow1.runFlowFn()` cycle
+        flow.willUnsubMap = flow.nextUnsubMap;
+        flow.nextUnsubMap = new Map();
+
+        // run below `flow1.runFlowFn()`
+        // if access A, means A is still used in flow, so needs to keep A
+        // remove A from willUnsubMap, willUnsubMap -> { B: unsubB }, A will keep, only unsub B
+        flow.runFlowFn();
+
+        // flow1.willUnsubMap's size, will only reduce, no increase
+        // if accessed both A & B, flow1.willUnsubMap -> {}, unsub nothing
+        flow.willUnsubMap.forEach((unsubFlowFromVal) => unsubFlowFromVal());
       }
-
-      allFlows.add(flow);
-
-      flow.deadDeps = flow.liveDeps;
-      flow.liveDeps = new Map();
-      flow.callback(true);
-      flow.deadDeps.forEach((remove) => remove());
     });
   });
-
-  setTimeout(() => allFlows.clear());
+  setTimeout(() => uniqueFlows.clear());
 };
 
 export function useSignal<T>(initialValue: T): [Getter<T>, Setter<T>] {
   const valRef = useRef<T>(initialValue);
-  const listeners = useRef<Setter<T>[]>([]);
+  const setters = useRef<Setter<T>[]>([]);
 
-  const hasUpdate = useRef(false);
-  const flowSetArr = useRef<FlowSet[]>(null as unknown as FlowSet[]);
-  if (!flowSetArr.current) {
-    flowSetArr.current = [new Set(), new Set(), new Set()];
-  }
+  const valFlows = useRef<Set<Flow>>(new Set());
+  const valUpdated = useRef(false);
 
-  const isFirst = useRef(true);
-  useIsomorphicLayoutEffect(() => {
-    if (isFirst.current) {
-      isFirst.current = false;
-    } else {
-      runFlows(flowSetArr.current[0]);
-    }
-  }, []);
-
-  const Render = ({ keyPath, mapCallback }: RenderProps) => {
-    const [value, setValue] = useState(valRef.current);
+  const View = ({ path, mapFn }: Props) => {
+    const [proVal, setProVal] = useState(valRef.current);
 
     useIsomorphicLayoutEffect(() => {
-      listeners.current.push(setValue);
+      setters.current.push(setProVal);
       return () => {
-        const index = listeners.current.indexOf(setValue);
-        listeners.current.splice(index, 1);
+        const index = setters.current.indexOf(setProVal);
+        setters.current.splice(index, 1);
       };
     }, []);
 
     useIsomorphicLayoutEffect(() => {
-      if (hasUpdate.current) {
-        hasUpdate.current = false;
-        flowSetArr.current.forEach((flowSet) => runFlows(flowSet));
+      if (valUpdated.current) {
+        valUpdated.current = false;
+        runValFlows(valFlows.current);
       }
     });
 
-    if (!Array.isArray(keyPath)) {
-      return value;
+    if (Array.isArray(path)) {
+      const realVal = path.reduce((obj: any, key: string) => obj[key], proVal);
+      if (mapFn) return realVal.map(mapFn);
+      return realVal;
     }
 
-    const subVal = keyPath.reduce((obj: any, key: string) => obj[key], value);
-
-    return mapCallback ? subVal.map(mapCallback) : subVal;
+    return proVal;
   };
 
-  const proxy = useCallback((obj: any, keyPath: string[]): T => {
+  const getDeep = useCallback((obj: any, path: string[]): T => {
     return new Proxy(obj, {
       get: (target, key: string) => {
         const val = target[key];
 
         if (key === 'map' && val === Array.prototype.map) {
-          const fakeArrayMap = (mapCallback: RenderProps['mapCallback']) => {
-            return <Render keyPath={keyPath} mapCallback={mapCallback} />;
-          };
-          return fakeArrayMap;
+          return (mapFn: Props['mapFn']) => <View path={path} mapFn={mapFn} />;
         }
 
-        keyPath.push(key);
+        path.push(key);
 
         if (isPrimitive(val)) {
-          return <Render keyPath={keyPath} />;
+          return <View path={path} />;
         }
 
-        return proxy(val, keyPath);
+        return getDeep(val, path);
       },
     }) as T;
   }, []);
 
   return useMemo(() => {
-    flowSetArr.current.forEach((flowSet) => flowSet.clear());
+    valFlows.current.clear();
 
     return [
       () => {
         try {
-          if (currentFlow) {
-            const flow = currentFlow;
-            const flowSet = flowSetArr.current[flow.arrIndex];
+          // in `runFlowFn()` has access several value getters,
+          // if access current signal's value, will reach here
+          if (curFlow) {
+            const flow = curFlow;
 
-            flowSet.add(flow);
-            flow.deadDeps.delete(valRef);
-            flow.liveDeps.set(valRef, () => flowSet.delete(flow));
+            valFlows.current.add(flow);
+            flow.nextUnsubMap.set(valRef, () => valFlows.current.delete(flow)); // use for next `runValFlows()`
+            flow.willUnsubMap.delete(valRef); // delete value from map, so will not unsub value
             return valRef.current;
           }
 
@@ -139,96 +132,70 @@ export function useSignal<T>(initialValue: T): [Getter<T>, Setter<T>] {
           useState();
 
           if (isPrimitive(valRef.current)) {
-            return (<Render />) as T;
+            return (<View />) as T;
           }
 
-          return proxy(valRef.current, []);
+          return getDeep(valRef.current, []);
         } catch (e) {
           return valRef.current;
         }
       },
-      (payload: SetStateAction<T>) => {
-        const getVal = (prev: T) =>
-          payload instanceof Function ? payload(prev) : payload;
+      (v: SetStateAction<T>) => {
+        valRef.current = v instanceof Function ? v(valRef.current) : v;
 
-        if (listeners.current.length === 0) {
-          valRef.current = getVal(valRef.current);
-          flowSetArr.current.forEach((flowSet) => runFlows(flowSet));
+        if (setters.current.length > 0) {
+          batch(() => setters.current.forEach((set) => set(valRef.current)));
+          valUpdated.current = true;
         } else {
-          batch(() => {
-            listeners.current.forEach((listener) => {
-              listener((prev) => (valRef.current = getVal(prev)));
-            });
-          });
-          hasUpdate.current = true;
+          runValFlows(valFlows.current);
         }
       },
     ];
-  }, [proxy]);
+  }, [getDeep]);
 }
 
 export function useUpdate(fn: () => void) {
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
+  const flowRef = useRef({
+    nextUnsubMap: new Map(),
+    willUnsubMap: new Map(),
+    runFlowFn: () => {
+      curFlow = flowRef.current;
+      fn();
+      curFlow = null;
+    },
+  });
 
   useIsomorphicLayoutEffect(() => {
-    const flow = {
-      arrIndex: 1,
-      liveDeps: new Map(),
-      deadDeps: new Map(),
-      callback: () => {
-        currentFlow = flow;
-        fnRef.current();
-        currentFlow = null;
-      },
-    };
-
-    flow.callback();
+    flowRef.current.runFlowFn();
   }, []);
 }
 
 export function useAuto<T>(fn: Getter<T>): Getter<T> {
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
-  const setter = useRef<Setter<T>>(() => undefined);
+  const flowRef = useRef({
+    nextUnsubMap: new Map(),
+    willUnsubMap: new Map(),
+    runFlowFn: (isInit?: 'isInit') => {
+      curFlow = flowRef.current;
 
-  const initVal = useMemo(() => {
-    const flow = {
-      arrIndex: 0,
-      liveDeps: new Map(),
-      deadDeps: new Map(),
-      callback: (_isUpdate?: boolean) => {
-        currentFlow = flow;
-        const val = fnRef.current();
-        if (_isUpdate) {
-          setter.current(val);
-        }
-        currentFlow = null;
-        return val;
-      },
-    };
+      const val = fn();
+      if (!isInit) setAutoVal(val);
 
-    return flow.callback(false);
-  }, []);
+      curFlow = null;
+      return val;
+    },
+  });
 
-  const [value, setValue] = useSignal<T>(initVal);
-  setter.current = setValue;
-
-  return value;
+  const initialVal = useMemo(() => flowRef.current.runFlowFn('isInit'), []);
+  const [autoVal, setAutoVal] = useSignal<T>(initialVal);
+  return autoVal;
 }
 
 export function useMount(fn: () => void) {
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
-
-  useIsomorphicLayoutEffect(() => fnRef.current(), []);
+  useIsomorphicLayoutEffect(() => fn(), []);
 }
 
 export function useCleanup(fn: () => void) {
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
-
-  useIsomorphicLayoutEffect(() => () => fnRef.current(), []);
+  useIsomorphicLayoutEffect(() => () => fn(), []);
 }
 
 export function Run<T>(fn: Getter<T>): T {
